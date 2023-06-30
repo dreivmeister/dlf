@@ -106,6 +106,8 @@ class Tensor:
         
         return out
     
+    
+    # should be used with caution
     def __mod__(self, other):
         other = other if isinstance(other, Tensor) else Tensor(other)
         out = Tensor(np.mod(self.data, other.data), (self, other), op=self.__mod__)
@@ -118,8 +120,7 @@ class Tensor:
         return out
     
     def __pow__(self, other):
-        assert isinstance(other, (int, float))
-        other = Tensor(other)
+        other = other if isinstance(other, Tensor) else Tensor(other)
         out = Tensor(np.power(self.data, other.data), (self,), op=self.__pow__)
         
         def grad_fn(g):
@@ -129,7 +130,25 @@ class Tensor:
         
         return out
     
+    @staticmethod
+    def sin(x):
+        out = Tensor(np.sin(x.data), (x,), op=Tensor.sin)
+        
+        def grad_fn(g):
+            x.grad += g * np.cos(x.data)
+        out.grad_fn = grad_fn
+        
+        return out
     
+    @staticmethod
+    def cos(x):
+        out = Tensor(np.cos(x.data), (x,), op=Tensor.cos)
+        
+        def grad_fn(g):
+            x.grad += g * -np.sin(x.data)
+        out.grad_fn = grad_fn
+        
+        return out
     
 
 
@@ -139,4 +158,21 @@ class Tensor:
 
 
 if __name__=="__main__":
-    pass
+    a = Tensor([[1,2,3],[3,4,5]])
+    b = Tensor([[1,8,1],[8,3,5]])
+    
+    
+    def f(a, b):
+        #return a % b
+        #return a - b * b ** a / a - b * 3 + 2
+        return Tensor.sin(a*b)
+    
+    c = f(a, b)
+    c.backward()
+    
+    eps = 1e-3
+    print(a)
+    print((f(a.data + eps, b.data) - f(a.data, b.data))/eps)
+    print(b)
+    print((f(a.data, b.data + eps) - f(a.data, b.data))/eps)
+    # doesnt match in last element
