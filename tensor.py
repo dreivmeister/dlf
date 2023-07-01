@@ -94,6 +94,9 @@ class Tensor:
         out.grad_fn = grad_fn
         
         return out
+        
+    def __rsub__(self, other):
+        return (-self) + other
     
     def __truediv__(self, other):
         other = other if isinstance(other, Tensor) else Tensor(other)
@@ -105,6 +108,9 @@ class Tensor:
         out.grad_fn = grad_fn
         
         return out
+
+    def __rtruediv__(self, other):
+        return other / self
     
     
     # should be used with caution
@@ -118,6 +124,9 @@ class Tensor:
         out.grad_fn = grad_fn
         
         return out
+
+    def __rmod__(self, other):
+        return other % self
     
     def __pow__(self, other):
         other = other if isinstance(other, Tensor) else Tensor(other)
@@ -129,6 +138,9 @@ class Tensor:
         out.grad_fn = grad_fn
         
         return out
+
+    def __rpow__(self, other):
+        return other ** self
     
     @staticmethod
     def sin(x):
@@ -139,16 +151,49 @@ class Tensor:
         out.grad_fn = grad_fn
         
         return out
+
     
     @staticmethod
-    def cos(x):
-        out = Tensor(np.cos(x.data), (x,), op=Tensor.cos)
-        
+    def reshape(x, shape, order=None):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.reshape(x, shape=shape, order=order), (x,), op=Tensor.reshape)
+
         def grad_fn(g):
-            x.grad += g * -np.sin(x.data)
+            x.grad += np.reshape(g, np.shape(x), order=order)
         out.grad_fn = grad_fn
-        
+
         return out
+
+    
+    @staticmethod
+    def roll(x, shift, axis=None):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.roll(x, shift=shift, axis=axis), (x,), op=Tensor.roll)
+
+        def grad_fn(g):
+            x.grad += np.roll(g, -shift, axis=axis)
+        out.grad_fn = grad_fn
+
+        return out
+
+    
+
+    
+    @staticmethod
+    def array_split(x, idxs, axis=0):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.array_split(x, indices_or_sections=idxs, axis=axis), (x,), op=Tensor.array_split)
+
+        def grad_fn(g):
+            x.grad += np.concatenate(g, axis=axis)
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+
+
+
     
 
 
