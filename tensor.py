@@ -55,6 +55,7 @@ class Tensor:
         for t in reversed(topo):
             t.grad_fn(t.grad)
             
+            
     # operations
     def __add__(self, other):
         other = other if isinstance(other, Tensor) else Tensor(other)
@@ -156,10 +157,10 @@ class Tensor:
     @staticmethod
     def reshape(x, shape, order=None):
         x = x if isinstance(x, Tensor) else Tensor(x)
-        out = Tensor(np.reshape(x, shape=shape, order=order), (x,), op=Tensor.reshape)
+        out = Tensor(np.reshape(x.data, shape=shape, order=order), (x,), op=Tensor.reshape)
 
         def grad_fn(g):
-            x.grad += np.reshape(g, np.shape(x), order=order)
+            x.grad += np.reshape(g, np.shape(x.data), order=order)
         out.grad_fn = grad_fn
 
         return out
@@ -168,7 +169,7 @@ class Tensor:
     @staticmethod
     def roll(x, shift, axis=None):
         x = x if isinstance(x, Tensor) else Tensor(x)
-        out = Tensor(np.roll(x, shift=shift, axis=axis), (x,), op=Tensor.roll)
+        out = Tensor(np.roll(x.data, shift=shift, axis=axis), (x,), op=Tensor.roll)
 
         def grad_fn(g):
             x.grad += np.roll(g, -shift, axis=axis)
@@ -182,14 +183,27 @@ class Tensor:
     @staticmethod
     def array_split(x, idxs, axis=0):
         x = x if isinstance(x, Tensor) else Tensor(x)
-        out = Tensor(np.array_split(x, indices_or_sections=idxs, axis=axis), (x,), op=Tensor.array_split)
+        out = Tensor(np.array_split(x.data, indices_or_sections=idxs, axis=axis), (x,), op=Tensor.array_split)
 
         def grad_fn(g):
             x.grad += np.concatenate(g, axis=axis)
         out.grad_fn = grad_fn
 
         return out
-    
+
+
+    """
+    def __eq__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(np.equal(self.data, other.data), (self, other), op=self.__eq__)
+
+        def grad_fn(g):
+            self.grad += g
+            other.grad += g
+        out.grad_fn = grad_fn
+
+        return out
+    """
     
 
 
