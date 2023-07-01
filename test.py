@@ -1,0 +1,16 @@
+import autograd.numpy as np
+from autograd import elementwise_grad
+
+
+a = np.array([[1,2,3],[3,2,4]])
+b = np.array([[5,2,3],[4,2,2]])
+
+
+def f(a, b):
+    if (a+1 <= b).any():
+        return np.sin(a)
+
+
+df = elementwise_grad(f)
+print(f(a,b))
+print(df(a,b))

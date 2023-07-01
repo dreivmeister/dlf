@@ -332,7 +332,103 @@ class Tensor:
         out.grad_fn = grad_fn
 
         return out
+    
+    @staticmethod
+    def split(x, idxs, axis=0):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.split(x.data, indices_or_sections=idxs, axis=axis), (x,), op=Tensor.split)
 
+        def grad_fn(g):
+            x.grad += np.concatenate(g, axis=axis)
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+    @staticmethod
+    def vsplit(x, idxs):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.vsplit(x.data, indices_or_sections=idxs), (x,), op=Tensor.vsplit)
+
+        def grad_fn(g):
+            x.grad += np.concatenate(g, axis=0)
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+    @staticmethod
+    def hsplit(x, idxs):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.hsplit(x.data, indices_or_sections=idxs), (x,), op=Tensor.hsplit)
+
+        def grad_fn(g):
+            x.grad += np.concatenate(g, axis=1)
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+    @staticmethod
+    def dsplit(x, idxs):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.dsplit(x.data, indices_or_sections=idxs), (x,), op=Tensor.dsplit)
+
+        def grad_fn(g):
+            x.grad += np.concatenate(g, axis=2)
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+    @staticmethod
+    def ravel(x, order=None):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.ravel(x.data, order=order), (x,), op=Tensor.ravel)
+
+        def grad_fn(g):
+            x.grad += np.reshape(g, np.shape(x.data), order=order)
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+    @staticmethod
+    def expand_dims(x, axis):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.expand_dims(x.data, axis=axis), (x,), op=Tensor.expand_dims)
+
+        def grad_fn(g):
+            x.grad += np.reshape(g, np.shape(x.data))
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+    @staticmethod
+    def squeeze(x, axis=None):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.squeeze(x.data, axis=axis), (x,), op=Tensor.squeeze)
+
+        def grad_fn(g):
+            x.grad += np.reshape(g, np.shape(x.data))
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+    @staticmethod
+    def diag(x, k=0):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.diag(x.data, k=k), (x,), op=Tensor.diag)
+
+        def grad_fn(g):
+            x.grad += np.diag(g, k=k)
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
 
     """
     def __eq__(self, other):
