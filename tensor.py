@@ -2,6 +2,8 @@
 
 import numpy as np
 
+
+# from autodidact
 def unbroadcast(target, g, broadcast_idx=0):
     """Remove broadcasted dimensions by summing along them.
 
@@ -130,8 +132,18 @@ class Tensor:
         
         return out
     
+    def __neg__(self):
+        out = Tensor(np.negative(self.data), (self,), op=self.__neg__)
+        
+        def grad_fn(g):
+            self.grad += -g
+        out.grad_fn = grad_fn
+        
+        return out
+    
     @staticmethod
     def sin(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
         out = Tensor(np.sin(x.data), (x,), op=Tensor.sin)
         
         def grad_fn(g):
@@ -142,6 +154,7 @@ class Tensor:
     
     @staticmethod
     def cos(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
         out = Tensor(np.cos(x.data), (x,), op=Tensor.cos)
         
         def grad_fn(g):
@@ -150,7 +163,139 @@ class Tensor:
         
         return out
     
+    @staticmethod
+    def tan(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.tan(x.data), (x,), op=Tensor.tan)
+        
+        def grad_fn(g):
+            x.grad += g / np.cos(x.data) ** 2
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    @staticmethod
+    def arcsin(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.arcsin(x.data), (x,), op=Tensor.arcsin)
+        
+        def grad_fn(g):
+            x.grad += g / np.sqrt(1 - x.data**2)
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    @staticmethod
+    def arccos(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.arccos(x.data), (x,), op=Tensor.arccos)
+        
+        def grad_fn(g):
+            x.grad += - g / np.sqrt(1 - x.data**2)
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    @staticmethod
+    def arctan(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.arctan(x.data), (x,), op=Tensor.arctan)
+        
+        def grad_fn(g):
+            x.grad += - g / (1 + x.data**2)
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    @staticmethod
+    def abs(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        # not really abs cause it only handles reals
+        out = Tensor(np.fabs(x.data), (x,), op=Tensor.abs)
+        
+        def grad_fn(g):
+            x.grad += g * np.sign(x.data)
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    @staticmethod
+    def exp(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.exp(x.data), (x,), op=Tensor.exp)
+        
+        def grad_fn(g):
+            x.grad += g * out.data
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    @staticmethod
+    def log(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.log(x.data), (x,), op=Tensor.log)
+        
+        def grad_fn(g):
+            x.grad += g / x.data
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    @staticmethod
+    def tanh(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.tanh(x.data), (x,), op=Tensor.tanh)
+        
+        def grad_fn(g):
+            x.grad += g / np.cosh(x.data) ** 2
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    @staticmethod
+    def sinh(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.sinh(x.data), (x,), op=Tensor.sinh)
+        
+        def grad_fn(g):
+            x.grad += g * np.cosh(x.data)
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    @staticmethod
+    def cosh(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.cosh(x.data), (x,), op=Tensor.cosh)
+        
+        def grad_fn(g):
+            x.grad += g * np.sinh(x.data)
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    @staticmethod
+    def sqrt(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.sqrt(x.data), (x,), op=Tensor.sqrt)
+        
+        def grad_fn(g):
+            x.grad += g / (2*out.data)
+        out.grad_fn = grad_fn
+        
+        return out
+    
 
+    # def __eq__(self, other):
+    #     other = other if isinstance(other, Tensor) else Tensor(other)
+    #     out = Tensor(np.equal(self.data, other.data), (self, other), op=self.__eq__)
+        
+    #     def grad_fn(g):
+    #         self.grad += g
+    #         other.grad += g
+    #     out.grad_fn = grad_fn
+        
+    #     return out
 
 
 
@@ -165,9 +310,10 @@ if __name__=="__main__":
     def f(a, b):
         #return a % b
         #return a - b * b ** a / a - b * 3 + 2
-        return Tensor.sin(a*b)
+        return Tensor.sin(a+b)
     
     c = f(a, b)
+    print(c)    
     c.backward()
     
     eps = 1e-3
