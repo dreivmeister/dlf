@@ -429,6 +429,85 @@ class Tensor:
         return out
     
     
+    @staticmethod
+    def flipud(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.flipud(x.data), (x,), op=Tensor.flipud)
+
+        def grad_fn(g):
+            x.grad += np.flipud(g)
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+    @staticmethod
+    def fliplr(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.fliplr(x.data), (x,), op=Tensor.fliplr)
+
+        def grad_fn(g):
+            x.grad += np.fliplr(g)
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+    @staticmethod
+    def rot90(x, k=1):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.rot90(x.data, k=k), (x,), op=Tensor.rot90)
+
+        def grad_fn(g):
+            x.grad += np.rot90(g, k=-k)
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+    @staticmethod
+    def trace(x, offset=1):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.trace(x.data, offset=offset), (x,), op=Tensor.trace)
+
+        def grad_fn(g):
+            x.grad += np.einsum('ij,...->ij...', np.eye(x.data.shape[0], x.data.shape[1], k=offset), g)
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+    @staticmethod
+    def triu(x, k=0):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.triu(x.data, k=k), (x,), op=Tensor.triu)
+
+        def grad_fn(g):
+            x.grad += np.triu(g, k=k)
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+    @staticmethod
+    def tril(x, k=0):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.tril(x.data, k=k), (x,), op=Tensor.tril)
+
+        def grad_fn(g):
+            x.grad += np.tril(g, k=k)
+        out.grad_fn = grad_fn
+
+        return out
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
     """
     def __eq__(self, other):
