@@ -24,7 +24,7 @@ def replace_zero(x, val):
     return np.where(x, x, val)
 
 
-def repeat_to_match_shape(g, shape, dtype, axis, keepdims):
+def repeat_to_match_shape(g, shape, axis, keepdims):
     """Returns the array g repeated along axis to fit shape
        Also returns the number of repetitions of the array."""
     if shape == ():
@@ -43,14 +43,30 @@ class Tensor:
         self.grad = 0
         self.op = op
         self.grad_fn = lambda x: None
-        self.broadcast_dim = None # maybe no need
         self.name = name
-        
-    def __key(self):
-        return (self.prev, self.op) # not working!!!
     
     def __hash__(self):
-        return hash(self.__key())
+        return id(self)
+    
+    @property
+    def shape(self):
+        return self.data.shape
+    @property
+    def ndim(self):
+        return self.data.ndim
+    @property
+    def size(self):
+        return self.data.size
+    @property
+    def dtype(self):
+        return self.data.dtype
+    
+    def any(self):
+        return self.data.any()
+    def all(self):
+        return self.data.all()
+    
+    
         
     def __repr__(self):
         if self.data.ndim < 2:
@@ -556,7 +572,7 @@ class Tensor:
     
     
     
-    #TODO: broadcast, sum, mean, prod, var, std, min, max, amax, amin, inner, dot, concat, reshape, ...
+    #TODO: mean, prod, var, std, min, max, amax, amin, inner, dot, concat, reshape, ...
     
     @staticmethod
     def repeat(x, repeats, axis=None):
@@ -607,12 +623,39 @@ class Tensor:
         out.grad_fn = grad_fn
         
         return out
+
+    @staticmethod
+    def broadcast_to(x, new_shape):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.broadcast_to(x.data, shape=new_shape), (x,), op=Tensor.broadcast_to)
+        old_shape = np.shape(x.data)
+        assert np.shape(out.data) == new_shape
+        assert len(old_shape) == len(new_shape), "Can't handle extra leading dims"
+        
+        def grad_fn(g):
+            broadcast_axes = tuple(np.where(np.logical_and(np.array(old_shape) == 1, np.array(new_shape) >  1))[0])
+            x.grad += np.sum(g, axis=broadcast_axes, keepdims=True)
+        out.grad_fn = grad_fn
+        
+        return out
+    
+
+    @staticmethod
+    def sum(x, axis=None, keepdims=False):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.sum(x.data, axis=axis, keepdims=keepdims), (x,), op=Tensor.sum)
+        x_shape = np.shape(x.data)
+        
+        def grad_fn(g):
+            x.grad += repeat_to_match_shape(g, x_shape, axis, keepdims)[0]
+        out.grad_fn = grad_fn
+        
+        return out
     
     
     
     
-    
-    
+    # not quite sure about these
     def __le__(self, other):
         other = other if isinstance(other, Tensor) else Tensor(other)
         out = Tensor(np.less_equal(self.data, other.data), (self, other), op=self.__le__)
@@ -633,27 +676,6 @@ class Tensor:
         other = other if isinstance(other, Tensor) else Tensor(other)
         out = Tensor(np.equal(self.data, other.data), (self, other), op=self.__le__)
         return out
-    
-    
-
-    """
-    def __eq__(self, other):
-        other = other if isinstance(other, Tensor) else Tensor(other)
-        out = Tensor(np.equal(self.data, other.data), (self, other), op=self.__eq__)
-
-        def grad_fn(g):
-            self.grad += g
-            other.grad += g
-        out.grad_fn = grad_fn
-
-        return out
-    """
-    
-    
-
-
-
-
 
 
 if __name__=="__main__":
@@ -662,10 +684,11 @@ if __name__=="__main__":
     
     
     def f(a, b):
-        #return a % b
-        #return a - b * b ** a / a - b * 3 + 2
-        if (a+1 <= b):
-            return Tensor.sin(a+b)
+        #  return a % b
+        # return a - b * b ** a / a - b * 3 + 2
+        # if (a+1 <= b).any():
+        #     return Tensor.sin(a+b)
+        return Tensor.sum(2*a)
     
     c = f(a, b)
     print(c)    
