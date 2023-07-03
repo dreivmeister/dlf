@@ -46,6 +46,12 @@ class Tensor:
         self.broadcast_dim = None # maybe no need
         self.name = name
         
+    def __key(self):
+        return (self.prev, self.op) # not working!!!
+    
+    def __hash__(self):
+        return hash(self.__key())
+        
     def __repr__(self):
         if self.data.ndim < 2:
             return f'Tensor(data={self.data}, grad={self.grad})'    
@@ -607,19 +613,26 @@ class Tensor:
     
     
     
-    # def __le__(self, other):
-    #     other = other if isinstance(other, Tensor) else Tensor(other)
-    #     out = Tensor(np.less_equal(self.data, other.data), (self, other), op=self.__le__)
-
-    #     def grad_fn(g):
-    #         self.grad += g
-    #         other.grad += g
-    #         #None
-    #     out.grad_fn = grad_fn
-
-    #     return out
-    
-    
+    def __le__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(np.less_equal(self.data, other.data), (self, other), op=self.__le__)
+        return out
+    def __lt__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(np.less(self.data, other.data), (self, other), op=self.__le__)
+        return out
+    def __ge__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(np.greater_equal(self.data, other.data), (self, other), op=self.__le__)
+        return out
+    def __gt__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(np.greater(self.data, other.data), (self, other), op=self.__le__)
+        return out
+    def __eq__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(np.equal(self.data, other.data), (self, other), op=self.__le__)
+        return out
     
     
 
@@ -652,7 +665,7 @@ if __name__=="__main__":
         #return a % b
         #return a - b * b ** a / a - b * 3 + 2
         if (a+1 <= b):
-            return Tensor.sin(a)
+            return Tensor.sin(a+b)
     
     c = f(a, b)
     print(c)    
