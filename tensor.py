@@ -24,6 +24,18 @@ def replace_zero(x, val):
     return np.where(x, x, val)
 
 
+def repeat_to_match_shape(g, shape, dtype, axis, keepdims):
+    """Returns the array g repeated along axis to fit shape
+       Also returns the number of repetitions of the array."""
+    if shape == ():
+      return g, 1
+    axis = list(axis) if isinstance(axis, tuple) else axis
+    new_shape = np.array(shape)
+    new_shape[axis] = 1
+    num_reps = np.prod(np.array(shape)[axis])
+    return np.broadcast_to(np.reshape(g, new_shape), shape), num_reps
+
+
 class Tensor:
     def __init__(self, data, prev=(), op=lambda x: None, name=None, *args, **kwargs) -> None:
         self.data = np.asarray(data, dtype=np.float32)
@@ -501,9 +513,111 @@ class Tensor:
         return out
     
     
+    @staticmethod
+    def clip(x, a_min, a_max):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.clip(x.data, a_min=a_min, a_max=a_max), (x,), op=Tensor.clip)
+        
+        def grad_fn(g):
+            x.grad += g * np.logical_and(out.data != a_min, out.data != a_max)
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    
+    @staticmethod
+    def swapaxes(x, axis1, axis2):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.swapaxes(x.data, axis1=axis1, axis2=axis2), (x,), op=Tensor.swapaxes)
+        
+        def grad_fn(g):
+            x.grad += np.swapaxes(g, axis2, axis1)
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    
+    @staticmethod
+    def moveaxis(x, source, destination):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.moveaxis(x.data, source=source, destination=destination), (x,), op=Tensor.moveaxis)
+        
+        def grad_fn(g):
+            x.grad += np.moveaxis(g, destination, source)
+        out.grad_fn = grad_fn
+        
+        return out
     
     
     
+    #TODO: broadcast, sum, mean, prod, var, std, min, max, amax, amin, inner, dot, concat, reshape, ...
+    
+    @staticmethod
+    def repeat(x, repeats, axis=None):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.repeat(x.data, repeats=repeats, axis=axis), (x,), op=Tensor.repeat)
+        shape = np.shape(x.data)
+        
+        def grad_fn(g):
+            if axis is None:  # If axis is none, np.repeat() repeats the flattened array.
+                expanded = np.reshape(g, (np.prod(shape),) + (repeats,))
+                x.grad += np.reshape(np.sum(expanded, axis=1, keepdims=False), shape)
+            else:
+                if shape[axis] == 1:  # For this common case, the logic is simple.
+                    x.grad += np.sum(g, axis=axis, keepdims=True)
+                else:
+                    expanded = np.reshape(g, shape[0:axis+1] + (repeats,) + shape[axis+1:])
+                    x.grad += np.sum(expanded, axis=axis+1, keepdims=False)
+        out.grad_fn = grad_fn
+        
+        return out
+                
+                
+    @staticmethod
+    def tile(x, reps):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.tile(x.data, reps=reps), (x,), op=Tensor.tile)
+        reps = [reps] if np.isscalar(reps) else reps
+        x_shape = np.shape(x.data)
+        
+        def grad_fn(g):
+            for axis, rep in enumerate(reps):
+                g = np.sum(np.split(g, rep, axis))
+            x.grad += np.reshape(g, x_shape)
+        out.grad_fn = grad_fn
+        
+        return out
+        
+    
+    @staticmethod
+    def transpose(x, axes=None):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.transpose(x.data, axes=axes), (x,), op=Tensor.transpose)
+        
+        def grad_fn(g):
+            if axes is not None:
+                axes = np.argsort(axes)
+            x.grad += np.transpose(g, axes)
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    
+    
+    
+    
+    
+    # def __le__(self, other):
+    #     other = other if isinstance(other, Tensor) else Tensor(other)
+    #     out = Tensor(np.less_equal(self.data, other.data), (self, other), op=self.__le__)
+
+    #     def grad_fn(g):
+    #         self.grad += g
+    #         other.grad += g
+    #         #None
+    #     out.grad_fn = grad_fn
+
+    #     return out
     
     
     
@@ -521,6 +635,8 @@ class Tensor:
 
         return out
     """
+    
+    
 
 
 
@@ -535,15 +651,19 @@ if __name__=="__main__":
     def f(a, b):
         #return a % b
         #return a - b * b ** a / a - b * 3 + 2
-        return Tensor.sin(a+b)
+        if (a+1 <= b):
+            return Tensor.sin(a)
     
     c = f(a, b)
     print(c)    
     c.backward()
     
-    eps = 1e-3
     print(a)
-    print((f(a.data + eps, b.data) - f(a.data, b.data))/eps)
     print(b)
-    print((f(a.data, b.data + eps) - f(a.data, b.data))/eps)
+    
+    # eps = 1e-3
+    # print(a)
+    # print((f(a.data + eps, b.data) - f(a.data, b.data))/eps)
+    # print(b)
+    # print((f(a.data, b.data + eps) - f(a.data, b.data))/eps)
     # doesnt match in last element

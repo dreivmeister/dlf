@@ -11,6 +11,8 @@ def f(a, b):
         return np.sin(a)
 
 
-df = elementwise_grad(f)
-print(f(a,b))
-print(df(a,b))
+df1 = elementwise_grad(f,0)
+df2 = elementwise_grad(f,1)
+#print(f(a,b))
+print(df1(a,b))
+print(df2(a,b))
