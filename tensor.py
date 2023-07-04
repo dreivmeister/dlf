@@ -91,6 +91,29 @@ class Tensor:
         for t in reversed(topo):
             t.grad_fn(t.grad)
             
+    
+    # not quite sure about these
+    def __le__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(np.less_equal(self.data, other.data), (self, other), op=self.__le__)
+        return out
+    def __lt__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(np.less(self.data, other.data), (self, other), op=self.__le__)
+        return out
+    def __ge__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(np.greater_equal(self.data, other.data), (self, other), op=self.__le__)
+        return out
+    def __gt__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(np.greater(self.data, other.data), (self, other), op=self.__le__)
+        return out
+    def __eq__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(np.equal(self.data, other.data), (self, other), op=self.__le__)
+        return out        
+    
             
     # operations
     def __add__(self, other):
@@ -571,9 +594,6 @@ class Tensor:
         return out
     
     
-    
-    #TODO: mean, prod, var, std, min, max, amax, amin, inner, dot, concat, reshape, ...
-    
     @staticmethod
     def repeat(x, repeats, axis=None):
         x = x if isinstance(x, Tensor) else Tensor(x)
@@ -652,35 +672,76 @@ class Tensor:
         
         return out
     
+    @staticmethod
+    def mean(x, axis=None, keepdims=False):
+        x = x if isinstance(x, Tensor), else Tensor(x)
+        out = Tensor(np.mean(x.data, axis=axis, keepdims=keepdims), (x,), op=Tensor.mean)
+        shape, dtype = np.shape(x.data), x.data.dtype
+        
+        def grad_fn(g):
+            g_repeated, num_reps = repeat_to_match_shape(g, shape, dtype, axis, keepdims)
+            return g_repeated / num_reps
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    
+    @staticmethod
+    def prod(x, axis=None, keepdims=False):
+        x = x if isinstance(x, Tensor), else Tensor(x)
+        out = Tensor(np.prod(x.data, axis=axis, keepdims=keepdims), (x,), op=Tensor.prod)
+        shape, dtype = np.shape(x.data), x.data.dtype
+        
+        def grad_fn(g):
+            g_repeated, _ = repeat_to_match_shape(g * out.data, shape, dtype, axis, keepdims)
+            return g_repeated / x.data
+        out.grad_fn = grad_fn
+        
+        return out
     
     
     
-    # not quite sure about these
-    def __le__(self, other):
-        other = other if isinstance(other, Tensor) else Tensor(other)
-        out = Tensor(np.less_equal(self.data, other.data), (self, other), op=self.__le__)
+    #TODO: var, std, min, max, amax, amin, concat, ...
+        
+    @staticmethod
+    def dot(a, b):
+        a = a if isinstance(a, Tensor) else Tensor(a)
+        b = b if isinstance(b, Tensor) else Tensor(b)
+        out = Tensor(np.dot(a.data, b.data), (a,b), op=Tensor.dot)
+        
+        a_ndim = a.data.ndim
+        b_ndim = b.data.ndim
+        a_dtype = a.data.dtype
+        b_dtype = b.data.dtype
+        
+        def grad_fn(g):
+            if b_ndim == 0 or b_ndim == 1 or a_ndim == 0:
+                contract_num = max(0, b_ndim - (a_ndim != 0))
+                out = np.tensordot(g, b.data, contract_num)
+            else:
+                out = np.tensordot(g, np.swapaxes(b.data, -1, -2), b_ndim - 1)
+            a.grad += np.asarray(out, dtype=a_dtype)
+            
+            
+            needs_transpose = b_ndim > 1 and a_ndim != 0
+            swap = (lambda x: np.swapaxes(x, -1, -2)) if needs_transpose else (lambda x: x)
+            if a_ndim == 0 or a_ndim == 1 or b_ndim == 0:
+                contract_num = max(0, a_ndim - (b_ndim != 0))
+                out = swap(np.tensordot(g, a.data, contract_num))
+            else:
+                out = swap(np.tensordot(
+                    g, a.data, [range(-a_ndim - b_ndim + 2, -b_ndim + 1), range(a_ndim - 1)]))
+            b.grad += np.asarray(out, dtype=b_dtype)
+        out.grad_fn = grad_fn
+        
         return out
-    def __lt__(self, other):
-        other = other if isinstance(other, Tensor) else Tensor(other)
-        out = Tensor(np.less(self.data, other.data), (self, other), op=self.__le__)
-        return out
-    def __ge__(self, other):
-        other = other if isinstance(other, Tensor) else Tensor(other)
-        out = Tensor(np.greater_equal(self.data, other.data), (self, other), op=self.__le__)
-        return out
-    def __gt__(self, other):
-        other = other if isinstance(other, Tensor) else Tensor(other)
-        out = Tensor(np.greater(self.data, other.data), (self, other), op=self.__le__)
-        return out
-    def __eq__(self, other):
-        other = other if isinstance(other, Tensor) else Tensor(other)
-        out = Tensor(np.equal(self.data, other.data), (self, other), op=self.__le__)
-        return out
+    
+    
 
 
 if __name__=="__main__":
-    a = Tensor([[1,2,3],[3,4,5]])
-    b = Tensor([[1,8,1],[8,3,5]])
+    a = Tensor([[1,2,3],[3,4,5],[3,4,5]])
+    b = Tensor([[1,8,1],[8,3,5],[8,3,5]])
     
     
     def f(a, b):
@@ -688,7 +749,7 @@ if __name__=="__main__":
         # return a - b * b ** a / a - b * 3 + 2
         # if (a+1 <= b).any():
         #     return Tensor.sin(a+b)
-        return Tensor.sum(2*a)
+        return Tensor.dot(a,b)
     
     c = f(a, b)
     print(c)    
