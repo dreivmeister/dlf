@@ -23,7 +23,6 @@ def replace_zero(x, val):
     """Replace all zeros in 'x' with 'val'."""
     return np.where(x, x, val)
 
-
 def repeat_to_match_shape(g, shape, axis, keepdims):
     """Returns the array g repeated along axis to fit shape
        Also returns the number of repetitions of the array."""
@@ -34,6 +33,12 @@ def repeat_to_match_shape(g, shape, axis, keepdims):
     new_shape[axis] = 1
     num_reps = np.prod(np.array(shape)[axis])
     return np.broadcast_to(np.reshape(g, new_shape), shape), num_reps
+    
+def grad_chooser(g, ans, x, axis=None, keepdims=None):
+    shape = np.shape(x)
+    g_repeated, _ = repeat_to_match_shape(g, shape, axis, keepdims)
+    argmax_locations = x == repeat_to_match_shape(ans, shape, axis, keepdims)[0]
+    return g_repeated * argmax_locations / np.sum(argmax_locations, axis=axis, keepdims=True)
 
 
 class Tensor:
@@ -65,8 +70,6 @@ class Tensor:
         return self.data.any()
     def all(self):
         return self.data.all()
-    
-    
         
     def __repr__(self):
         if self.data.ndim < 2:
@@ -92,7 +95,7 @@ class Tensor:
             t.grad_fn(t.grad)
             
     
-    # not quite sure about these
+    # relativley sure about these
     def __le__(self, other):
         other = other if isinstance(other, Tensor) else Tensor(other)
         out = Tensor(np.less_equal(self.data, other.data), (self, other), op=self.__le__)
@@ -674,7 +677,7 @@ class Tensor:
     
     @staticmethod
     def mean(x, axis=None, keepdims=False):
-        x = x if isinstance(x, Tensor), else Tensor(x)
+        x = x if isinstance(x, Tensor) else Tensor(x)
         out = Tensor(np.mean(x.data, axis=axis, keepdims=keepdims), (x,), op=Tensor.mean)
         shape, dtype = np.shape(x.data), x.data.dtype
         
@@ -688,7 +691,7 @@ class Tensor:
     
     @staticmethod
     def prod(x, axis=None, keepdims=False):
-        x = x if isinstance(x, Tensor), else Tensor(x)
+        x = x if isinstance(x, Tensor) else Tensor(x)
         out = Tensor(np.prod(x.data, axis=axis, keepdims=keepdims), (x,), op=Tensor.prod)
         shape, dtype = np.shape(x.data), x.data.dtype
         
@@ -698,10 +701,66 @@ class Tensor:
         out.grad_fn = grad_fn
         
         return out
+
+
+    @staticmethod
+    def var(x, axis=None, ddof=0, keepdims=False):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.var(x.data, axis=axis, ddof=ddof, keepdims=keepdims), (x,), op=Tensor.var)
+        shape, dtype = np.shape(x.data), x.data.dtype
+        
+        def grad_fn(g):
+            g_repeated, num_reps = repeat_to_match_shape(g, shape, dtype, axis, keepdims)
+            x_minus_mean = x.data - np.mean(x.data, axis=axis, keepdims=True)
+            return 2.0 * g_repeated * x_minus_mean / (num_reps - ddof)
+        out.grad_fn = grad_fn
+        
+        return out
+
+    @staticmethod
+    def std(x, axis=None, ddof=0, keepdims=False):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.var(x.data, axis=axis, ddof=ddof, keepdims=keepdims), (x,), op=Tensor.var)
+        shape, dtype = np.shape(x.data), x.data.dtype
+        
+        def grad_fn(g):
+            g_repeated, num_reps = repeat_to_match_shape(g, shape, dtype, axis, keepdims)  # Avoid division by zero.
+            if num_reps <= 1:
+                return g_repeated * 0.0
+            else:
+                g_repeated, num_reps = repeat_to_match_shape(g / out.data, shape, dtype, axis, keepdims)
+                x_minus_mean = x.data - np.mean(x.data, axis=axis, keepdims=True)
+                return g_repeated * x_minus_mean / (num_reps - ddof)
+        out.grad_fn = grad_fn
+        
+        return out
+
+
+    @staticmethod
+    def max(x, axis=None, keepdims=False):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.max(x.data, axis=axis, keepdims=keepdims), (x,), op=Tensor.max)
+        
+        def grad_fn(g):
+            x.grad += grad_chooser(g, out.data, x.data, axis=axis, keepdims=keepdims)
+        out.grad_fn = grad_fn
+        
+        return out
     
     
+    @staticmethod
+    def min(x, axis=None, keepdims=False):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(np.min(x.data, axis=axis, keepdims=keepdims), (x,), op=Tensor.min)
+        
+        def grad_fn(g):
+            x.grad += grad_chooser(g, out.data, x.data, axis=axis, keepdims=keepdims)
+        out.grad_fn = grad_fn
+        
+        return out
     
-    #TODO: var, std, min, max, amax, amin, concat, ...
+    
+    #TODO: concat, take, untake, convolve
         
     @staticmethod
     def dot(a, b):
@@ -749,7 +808,7 @@ if __name__=="__main__":
         # return a - b * b ** a / a - b * 3 + 2
         # if (a+1 <= b).any():
         #     return Tensor.sin(a+b)
-        return Tensor.dot(a,b)
+        return Tensor.dot(a,Tensor.max(b))
     
     c = f(a, b)
     print(c)    
