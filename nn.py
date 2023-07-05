@@ -97,11 +97,27 @@ class LayerNorm(Module):
         return [self.gamma, self.beta]
     
     
+class Dropout(Module):
+    def __init__(self, p_drop) -> None:
+        self.p_keep = 1 - p_drop
+    
+    def __call__(self, x, training=True):
+        if training:
+            binary_mask = T.rand(x.shape) < self.p_keep
+            result = x * binary_mask
+            return result / self.p_keep
+        return x
+    
+    def parameters(self):
+        return []
+    
+    
 if __name__=="__main__":
     l = LinearLayer(3, 1, nonlin=T.tanh)
     b = BatchNorm1D(1)
     ll = LayerNorm(1)
+    d = Dropout(0.5)
     x = T.rand((10,3))
-    o = ll(b(l(x)))
+    o = ll(b(d(l(x))))
+    o.backward()
     print(o.shape)
-    

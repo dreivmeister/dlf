@@ -737,10 +737,10 @@ class Tensor:
     def mean(x, axis=None, keepdims=False):
         x = x if isinstance(x, Tensor) else Tensor(x)
         out = Tensor(np.mean(x.data, axis=axis, keepdims=keepdims), (x,), op=Tensor.mean)
-        shape, dtype = np.shape(x.data), x.data.dtype
+        shape = np.shape(x.data)
         
         def grad_fn(g):
-            g_repeated, num_reps = repeat_to_match_shape(g, shape, dtype, axis, keepdims)
+            g_repeated, num_reps = repeat_to_match_shape(g, shape, axis, keepdims)
             return g_repeated / num_reps
         out.grad_fn = grad_fn
         
@@ -751,10 +751,10 @@ class Tensor:
     def prod(x, axis=None, keepdims=False):
         x = x if isinstance(x, Tensor) else Tensor(x)
         out = Tensor(np.prod(x.data, axis=axis, keepdims=keepdims), (x,), op=Tensor.prod)
-        shape, dtype = np.shape(x.data), x.data.dtype
+        shape = np.shape(x.data)
         
         def grad_fn(g):
-            g_repeated, _ = repeat_to_match_shape(g * out.data, shape, dtype, axis, keepdims)
+            g_repeated, _ = repeat_to_match_shape(g * out.data, shape, axis, keepdims)
             return g_repeated / x.data
         out.grad_fn = grad_fn
         
@@ -765,10 +765,10 @@ class Tensor:
     def var(x, axis=None, ddof=0, keepdims=False):
         x = x if isinstance(x, Tensor) else Tensor(x)
         out = Tensor(np.var(x.data, axis=axis, ddof=ddof, keepdims=keepdims), (x,), op=Tensor.var)
-        shape, dtype = np.shape(x.data), x.data.dtype
+        shape = np.shape(x.data)
         
         def grad_fn(g):
-            g_repeated, num_reps = repeat_to_match_shape(g, shape, dtype, axis, keepdims)
+            g_repeated, num_reps = repeat_to_match_shape(g, shape, axis, keepdims)
             x_minus_mean = x.data - np.mean(x.data, axis=axis, keepdims=True)
             return 2.0 * g_repeated * x_minus_mean / (num_reps - ddof)
         out.grad_fn = grad_fn
@@ -779,10 +779,10 @@ class Tensor:
     def std(x, axis=None, ddof=0, keepdims=False):
         x = x if isinstance(x, Tensor) else Tensor(x)
         out = Tensor(np.var(x.data, axis=axis, ddof=ddof, keepdims=keepdims), (x,), op=Tensor.var)
-        shape, dtype = np.shape(x.data), x.data.dtype
+        shape = np.shape(x.data)
         
         def grad_fn(g):
-            g_repeated, num_reps = repeat_to_match_shape(g, shape, dtype, axis, keepdims)  # Avoid division by zero.
+            g_repeated, num_reps = repeat_to_match_shape(g, shape, axis, keepdims)  # Avoid division by zero.
             if num_reps <= 1:
                 return g_repeated * 0.0
             else:
