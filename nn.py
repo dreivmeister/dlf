@@ -1,5 +1,8 @@
 import numpy as np
-from tensor import Tensor as T, dot
+from tensor import Tensor as T
+
+
+tr_l_tw = lambda x: T.transpose(x, (-1,-2))
 
 class Module:
     def zero_grad(self):
@@ -26,7 +29,7 @@ class LinearLayer(Module):
         self.nonlin = nonlin
     
     def __call__(self, x):
-        act = dot(x, T.transpose(self.w, (-1,-2)))
+        act = T.dot(x, T.transpose(self.w, (-1,-2)))
         if self.bias:
             act = act + self.b
         return self.nonlin(act) if self.nonlin else act
@@ -110,6 +113,43 @@ class Dropout(Module):
     
     def parameters(self):
         return []
+    
+def softmax(logits, axis=1):
+    logits = logits - T.max(logits, axis=axis, keepdims=True)
+    logits_exp = T.exp(logits)
+    exp_sum = T.sum(logits_exp, axis=axis, keepdims=True)
+    return logits_exp / exp_sum
+    
+class AttentionHead(Module):
+    def __init__(self, block_size, n_embd, head_size, dropout=0.2, mask=False):
+        self.key = LinearLayer(n_embd, head_size, bias=False)
+        self.query = LinearLayer(n_embd, head_size, bias=False)
+        self.value = LinearLayer(n_embd, head_size, bias=False)
+        self.do_mask = mask
+        if mask:
+            m = np.zeros((block_size,block_size))
+            m[np.triu_indices(block_size,1)] = -np.inf
+            self.mask = T(m)
+        
+        self.dropout = Dropout(dropout)
+    
+    def __call__(self, x):
+        B, T, C = x.shape
+        k = self.key(x) # (batch_size,block_size,token_dim) @ (n_embd, head_size) 
+        q = self.query(x) # (B,T,C)
+        
+        wei = T.dot(q, T.transpose(k, (-1,-2))) # transpose last two dims
+        if self.do_mask:
+            wei = wei + self.mask
+        wei = softmax(wei, axis=2) # (B, T, T)
+        wei = self.dropout(wei)
+        
+        v = self.value(x)
+        out = T.dot(wei, v)
+        return out
+    
+    def parameters(self):
+        return [*self.key.parameters(),*self.query.parameters(),*self.value.parameters()]
     
     
 if __name__=="__main__":

@@ -49,6 +49,11 @@ class Tensor:
         self.op = op
         self.grad_fn = lambda x: None
         self.name = name
+        
+    def __repr__(self):
+        if self.data.ndim < 2:
+            return f'Tensor(data={self.data}, grad={self.grad})'    
+        return f'Tensor\ndata=\n{self.data},\ngrad=\n{self.grad})'
     
     def __hash__(self):
         return id(self)
@@ -100,11 +105,6 @@ class Tensor:
     def all(self):
         out = Tensor(np.all(self.data), (self,), op=self.__le__)
         return out
-        
-    def __repr__(self):
-        if self.data.ndim < 2:
-            return f'Tensor(data={self.data}, grad={self.grad})'    
-        return f'Tensor\ndata=\n{self.data},\ngrad=\n{self.grad})'
     
     def backward(self, gradient=None):
         if gradient is None:
@@ -786,7 +786,7 @@ class Tensor:
             if num_reps <= 1:
                 return g_repeated * 0.0
             else:
-                g_repeated, num_reps = repeat_to_match_shape(g / out.data, shape, dtype, axis, keepdims)
+                g_repeated, num_reps = repeat_to_match_shape(g / out.data, shape, axis, keepdims)
                 x_minus_mean = x.data - np.mean(x.data, axis=axis, keepdims=True)
                 return g_repeated * x_minus_mean / (num_reps - ddof)
         out.grad_fn = grad_fn
@@ -852,40 +852,6 @@ class Tensor:
         out.grad_fn = grad_fn
         
         return out
-    
-def dot(a, b):
-    a = a if isinstance(a, Tensor) else Tensor(a)
-    b = b if isinstance(b, Tensor) else Tensor(b)
-    out = Tensor(np.dot(a.data, b.data), (a,b), op=Tensor.dot)
-    
-    a_ndim = a.data.ndim
-    b_ndim = b.data.ndim
-    a_dtype = a.data.dtype
-    b_dtype = b.data.dtype
-    
-    def grad_fn(g):
-        if b_ndim == 0 or b_ndim == 1 or a_ndim == 0:
-            contract_num = max(0, b_ndim - (a_ndim != 0))
-            out = np.tensordot(g, b.data, contract_num)
-        else:
-            out = np.tensordot(g, np.swapaxes(b.data, -1, -2), b_ndim - 1)
-        a.grad += np.asarray(out, dtype=a_dtype)
-        
-        
-        needs_transpose = b_ndim > 1 and a_ndim != 0
-        swap = (lambda x: np.swapaxes(x, -1, -2)) if needs_transpose else (lambda x: x)
-        if a_ndim == 0 or a_ndim == 1 or b_ndim == 0:
-            contract_num = max(0, a_ndim - (b_ndim != 0))
-            out = swap(np.tensordot(g, a.data, contract_num))
-        else:
-            out = swap(np.tensordot(
-                g, a.data, [range(-a_ndim - b_ndim + 2, -b_ndim + 1), range(a_ndim - 1)]))
-        b.grad += np.asarray(out, dtype=b_dtype)
-    out.grad_fn = grad_fn
-    
-    return out
-    
-
 
 if __name__=="__main__":
     # a = Tensor([[1,2,3],[3,4,5],[3,4,5]])
