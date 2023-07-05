@@ -67,9 +67,11 @@ class Tensor:
         return self.data.dtype
     
     def any(self):
-        return self.data.any()
+        out = Tensor(np.any(self.data), (self,), op=self.__le__)
+        return out
     def all(self):
-        return self.data.all()
+        out = Tensor(np.all(self.data), (self,), op=self.__le__)
+        return out
         
     def __repr__(self):
         if self.data.ndim < 2:
@@ -94,6 +96,18 @@ class Tensor:
         for t in reversed(topo):
             t.grad_fn(t.grad)
             
+            
+    def __getitem__(self, idx):
+        out = Tensor(self.data[idx], (self,), op=self.__getitem__)
+        
+        def grad_fn(g):
+            self_prime = np.zeros_like(self.data)
+            self_prime[idx] = g
+            self.grad += self_prime
+        out.grad_fn = grad_fn
+    
+        return out
+    
     
     # relativley sure about these
     def __le__(self, other):
@@ -116,7 +130,6 @@ class Tensor:
         other = other if isinstance(other, Tensor) else Tensor(other)
         out = Tensor(np.equal(self.data, other.data), (self, other), op=self.__le__)
         return out        
-    
             
     # operations
     def __add__(self, other):
@@ -616,6 +629,21 @@ class Tensor:
         out.grad_fn = grad_fn
         
         return out
+    
+    
+    # might work
+    @staticmethod
+    def concatenate(a, axis=0):
+        a = [x if isinstance(x, Tensor) else Tensor(x) for x in a]
+        out = Tensor(np.concatenate([x.data for x in a], axis=axis), (*a,), op=Tensor.concatenate)
+        def grad_fn(g):
+            lens = [x.data.shape[axis] for x in a]
+            g_split = np.split(g, np.cumsum(lens), axis=axis)
+            for i,x in enumerate(a):
+                x.grad += g_split[i]    
+        out.grad_fn = grad_fn
+        
+        return out
                 
                 
     @staticmethod
@@ -799,23 +827,38 @@ class Tensor:
 
 
 if __name__=="__main__":
-    a = Tensor([[1,2,3],[3,4,5],[3,4,5]])
-    b = Tensor([[1,8,1],[8,3,5],[8,3,5]])
+    # a = Tensor([[1,2,3],[3,4,5],[3,4,5]])
+    # b = Tensor([[1,8,1],[8,3,5],[8,3,5]])
     
     
-    def f(a, b):
-        #  return a % b
-        # return a - b * b ** a / a - b * 3 + 2
-        # if (a+1 <= b).any():
-        #     return Tensor.sin(a+b)
-        return Tensor.dot(a,Tensor.max(b))
+    a = Tensor([[1, 2], [3, 4]])
+    b = Tensor([[5, 6]])
     
-    c = f(a, b)
-    print(c)    
+    
+    c = Tensor.concatenate((a,b),axis=0)
+    print(c)
     c.backward()
     
     print(a)
     print(b)
+    
+    
+    
+    
+    # def f(a, b):
+    #     #  return a % b
+    #     # return a - b * b ** a / a - b * 3 + 2
+    #     # if (a+1 <= b).any():
+    #     #     return Tensor.sin(a+b)
+    #     return Tensor.sin(Tensor.cos(a)[:2,:1])
+    #     #return Tensor.dot(a,Tensor.max(b))
+    
+    # c = f(a, b)
+    # print(c)    
+    # c.backward()
+    
+    # print(a)
+    # print(b)
     
     # eps = 1e-3
     # print(a)
