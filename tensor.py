@@ -66,6 +66,34 @@ class Tensor:
     def dtype(self):
         return self.data.dtype
     
+    @staticmethod
+    def zeros(shape):
+        return Tensor(np.zeros(shape))
+    
+    @staticmethod
+    def zeros_like(tensor):
+        return Tensor(np.zeros_like(tensor))
+    
+    @staticmethod
+    def ones(shape):
+        return Tensor(np.ones(shape))
+    
+    @staticmethod
+    def ones_like(tensor):
+        return Tensor(np.ones_like(tensor))
+    
+    @staticmethod
+    def eye(dim):
+        return Tensor(np.eye(dim))
+    
+    @staticmethod
+    def rand(shape):
+        return Tensor(np.random.rand(*shape))
+    
+    @staticmethod
+    def uniform(low, high, shape):
+        return Tensor(np.random.uniform(low,high,shape))
+    
     def any(self):
         out = Tensor(np.any(self.data), (self,), op=self.__le__)
         return out
@@ -667,13 +695,15 @@ class Tensor:
         x = x if isinstance(x, Tensor) else Tensor(x)
         out = Tensor(np.transpose(x.data, axes=axes), (x,), op=Tensor.transpose)
         
+        if axes is not None:
+            axes = np.argsort(axes)
+        
         def grad_fn(g):
-            if axes is not None:
-                axes = np.argsort(axes)
             x.grad += np.transpose(g, axes)
         out.grad_fn = grad_fn
         
         return out
+
 
     @staticmethod
     def broadcast_to(x, new_shape):
@@ -788,7 +818,7 @@ class Tensor:
         return out
     
     
-    #TODO: concat, take, untake, convolve
+    #TODO: convolve
         
     @staticmethod
     def dot(a, b):
@@ -835,7 +865,7 @@ if __name__=="__main__":
     b = Tensor([[5, 6]])
     
     
-    c = Tensor.concatenate((a,b),axis=0)
+    c = Tensor.concatenate((a,Tensor.transpose(b)),axis=1)
     print(c)
     c.backward()
     
