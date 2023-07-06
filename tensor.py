@@ -852,6 +852,14 @@ class Tensor:
         out.grad_fn = grad_fn
         
         return out
+    
+    @staticmethod
+    def matmul(a, b):
+        a = a if isinstance(a, Tensor) else Tensor(a)
+        b = b if isinstance(b, Tensor) else Tensor(b)
+        out = Tensor(np.matmul(a.data, b.data), (a,b), op=Tensor.dot)
+        
+        pass
 
 if __name__=="__main__":
     # a = Tensor([[1,2,3],[3,4,5],[3,4,5]])

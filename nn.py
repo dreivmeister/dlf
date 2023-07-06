@@ -134,11 +134,12 @@ class AttentionHead(Module):
         self.dropout = Dropout(dropout)
     
     def __call__(self, x):
-        B, T, C = x.shape
+        B, t, C = x.shape
         k = self.key(x) # (batch_size,block_size,token_dim) @ (n_embd, head_size) 
         q = self.query(x) # (B,T,C)
-        
-        wei = T.dot(q, T.transpose(k, (-1,-2))) # transpose last two dims
+        print(k.shape, q.shape)
+        wei = T.dot(q, T.transpose(k, (0, -1,-2))) # transpose last two dims
+        print(wei.shape)
         if self.do_mask:
             wei = wei + self.mask
         wei = softmax(wei, axis=2) # (B, T, T)
@@ -153,11 +154,14 @@ class AttentionHead(Module):
     
     
 if __name__=="__main__":
-    l = LinearLayer(3, 1, nonlin=T.tanh)
-    b = BatchNorm1D(1)
-    ll = LayerNorm(1)
-    d = Dropout(0.5)
-    x = T.rand((10,3))
-    o = ll(b(d(l(x))))
+    # l = LinearLayer(3, 1, nonlin=T.tanh)
+    # b = BatchNorm1D(1)
+    # ll = LayerNorm(1)
+    # d = Dropout(0.5)
+    x = T.rand((10,4,16))
+    #o = ll(b(d(l(x))))
+    ah = AttentionHead(4,16,4,mask=True)
+    
+    o = ah(x)
     o.backward()
     print(o.shape)
