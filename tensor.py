@@ -859,7 +859,38 @@ class Tensor:
         b = b if isinstance(b, Tensor) else Tensor(b)
         out = Tensor(np.matmul(a.data, b.data), (a,b), op=Tensor.dot)
         
-        pass
+        a_ndim = a.data.ndim
+        b_ndim = b.data.ndim
+        
+        def grad_fn(g):
+            if np.ndim(g) == 0:  # A_ndim == B_ndim == 1
+                return unbroadcast(g * b.data, a_ndim)
+            if a_ndim == 1:
+                g = np.expand_dims(g, np.ndim(g) - 1)
+            if b_ndim == 1:  # The result we need is an outer product
+                b.data = np.expand_dims(b.data, 0)
+                g = np.expand_dims(g, np.ndim(g))
+            else:  # We need to swap the last two axes of B
+                b.data = np.swapaxes(b.data, b_ndim - 2, b_ndim - 1)
+            a.grad += np.matmul(g, b.data)
+            
+            if np.ndim(g) == 0:  # A_ndim == B_ndim == 1
+                return unbroadcast(g * a.data, b_ndim)
+            B_is_vec = (b_ndim == 1)
+            if B_is_vec:
+                g = np.expand_dims(g, np.ndim(g))
+            if a_ndim == 1:  # The result we need is an outer product
+                a.data = np.expand_dims(a.data, 1)
+                g = np.expand_dims(g, np.ndim(g) - 1)
+            else:  # We need to swap the last two axes of A
+                a.data = np.swapaxes(a.data, a_ndim - 2, a_ndim - 1)
+            result = np.matmul(a.data, g)
+            if B_is_vec:
+                result = np.squeeze(result, np.ndim(g) - 1)
+            b.grad += result
+        out.grad_fn = grad_fn
+        
+        return out
 
 if __name__=="__main__":
     # a = Tensor([[1,2,3],[3,4,5],[3,4,5]])

@@ -29,7 +29,7 @@ class LinearLayer(Module):
         self.nonlin = nonlin
     
     def __call__(self, x):
-        act = T.dot(x, T.transpose(self.w, (-1,-2)))
+        act = T.matmul(x, T.transpose(self.w, (-1,-2)))
         if self.bias:
             act = act + self.b
         return self.nonlin(act) if self.nonlin else act
@@ -137,8 +137,7 @@ class AttentionHead(Module):
         B, t, C = x.shape
         k = self.key(x) # (batch_size,block_size,token_dim) @ (n_embd, head_size) 
         q = self.query(x) # (B,T,C)
-        print(k.shape, q.shape)
-        wei = T.dot(q, T.transpose(k, (0, -1,-2))) # transpose last two dims
+        wei = T.matmul(q, T.transpose(k, (0, -1,-2))) # transpose last two dims
         print(wei.shape)
         if self.do_mask:
             wei = wei + self.mask
@@ -146,7 +145,7 @@ class AttentionHead(Module):
         wei = self.dropout(wei)
         
         v = self.value(x)
-        out = T.dot(wei, v)
+        out = T.matmul(wei, v)
         return out
     
     def parameters(self):
