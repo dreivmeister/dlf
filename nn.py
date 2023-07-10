@@ -153,6 +153,20 @@ class AttentionHead(Module):
         return [*self.key.parameters(),*self.query.parameters(),*self.value.parameters()]
     
     
+def negative_log_likelihood(probs, targets):
+    # binary classification
+    # preds is a probability vector
+    # targets is a vector of zeros and ones
+    label_probs = probs * targets + (1 - probs) * (1 - targets)
+    return -(T.sum(T.log(label_probs)))
+
+def cross_entropy(probs, targets):
+    # preds is a probability vector (each column sums to one)
+    # targets is a one hot vector
+    log_probs = T.log(probs + 10e-20)
+    return -T.sum(targets * log_probs)
+    
+    
 if __name__=="__main__":
     # l = LinearLayer(3, 1, nonlin=T.tanh)
     # b = BatchNorm1D(1)
