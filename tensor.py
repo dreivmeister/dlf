@@ -40,6 +40,9 @@ def grad_chooser(g, ans, x, axis=None, keepdims=None):
     argmax_locations = x == repeat_to_match_shape(ans, shape, axis, keepdims)[0]
     return g_repeated * argmax_locations / np.sum(argmax_locations, axis=axis, keepdims=True)
 
+def argsort(x): 
+    return type(x)(sorted(range(len(x)), key=x.__getitem__)) 
+
 
 class Tensor:
     def __init__(self, data, prev=(), op=lambda x: None, name=None, *args, **kwargs) -> None:
@@ -122,6 +125,7 @@ class Tensor:
         build_topo(self)
 
         for t in reversed(topo):
+            print(t.op)
             t.grad_fn(t.grad)
             
             
@@ -688,18 +692,28 @@ class Tensor:
         out.grad_fn = grad_fn
         
         return out
-        
     
+    """
+    def transpose(self, order):
+        input_order = order
+        out = Tensor(np.transpose(self.data, order), (self,), op=self.transpose)
+        
+        def grad_fn(gradient):
+            self.grad += np.transpose(gradient, argsort(input_order))
+            # or: self.grad += np.transpose(gradient, np.argsort(input_order))
+        out.grad_fn = grad_fn
+
+        return out
+    """
+        
     @staticmethod
     def transpose(x, axes=None):
+        input_axes = axes
         x = x if isinstance(x, Tensor) else Tensor(x)
         out = Tensor(np.transpose(x.data, axes=axes), (x,), op=Tensor.transpose)
         
-        if axes is not None:
-            axes = np.argsort(axes)
-        
         def grad_fn(g):
-            x.grad += np.transpose(g, axes)
+            x.grad += np.transpose(g, argsort(input_axes))
         out.grad_fn = grad_fn
         
         return out
@@ -857,7 +871,7 @@ class Tensor:
     def matmul(a, b):
         a = a if isinstance(a, Tensor) else Tensor(a)
         b = b if isinstance(b, Tensor) else Tensor(b)
-        out = Tensor(np.matmul(a.data, b.data), (a,b), op=Tensor.dot)
+        out = Tensor(np.matmul(a.data, b.data), (a,b), op=Tensor.matmul)
         
         a_ndim = a.data.ndim
         b_ndim = b.data.ndim

@@ -1,8 +1,9 @@
 import numpy as np
 from tensor import Tensor as T
 
+def transpose_last_two(x):
+    return T.transpose(x, axes=list(range(len(x.shape)-2))+[-1, -2])
 
-tr_l_tw = lambda x: T.transpose(x, (-1,-2))
 
 class Module:
     def zero_grad(self):
@@ -29,7 +30,7 @@ class LinearLayer(Module):
         self.nonlin = nonlin
     
     def __call__(self, x):
-        act = T.matmul(x, T.transpose(self.w, (-1,-2)))
+        act = T.matmul(x, transpose_last_two(self.w))
         if self.bias:
             act = act + self.b
         return self.nonlin(act) if self.nonlin else act
@@ -137,8 +138,7 @@ class AttentionHead(Module):
         B, t, C = x.shape
         k = self.key(x) # (batch_size,block_size,token_dim) @ (n_embd, head_size) 
         q = self.query(x) # (B,T,C)
-        wei = T.matmul(q, T.transpose(k, (0, -1,-2))) # transpose last two dims
-        print(wei.shape)
+        wei = T.matmul(q, transpose_last_two(k)) # transpose last two dims
         if self.do_mask:
             wei = wei + self.mask
         wei = softmax(wei, axis=2) # (B, T, T)
@@ -160,7 +160,7 @@ if __name__=="__main__":
     x = T.rand((10,4,16))
     #o = ll(b(d(l(x))))
     ah = AttentionHead(4,16,4,mask=True)
-    
     o = ah(x)
+    print(o.shape)
     o.backward()
     print(o.shape)
