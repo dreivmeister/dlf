@@ -138,7 +138,8 @@ class AttentionHead(Module):
         B, t, C = x.shape
         k = self.key(x) # (batch_size,block_size,token_dim) @ (n_embd, head_size) 
         q = self.query(x) # (B,T,C)
-        wei = T.matmul(q, transpose_last_two(k)) # transpose last two dims
+        print('q', q.shape)
+        wei = T.matmul(q, T.transpose(k, (0,2,1))) # transpose last two dims
         if self.do_mask:
             wei = wei + self.mask
         wei = softmax(wei, axis=2) # (B, T, T)
@@ -161,6 +162,6 @@ if __name__=="__main__":
     #o = ll(b(d(l(x))))
     ah = AttentionHead(4,16,4,mask=True)
     o = ah(x)
-    print(o.shape)
+    print('o', o.shape)
     o.backward()
     print(o.shape)

@@ -41,7 +41,7 @@ def grad_chooser(g, ans, x, axis=None, keepdims=None):
     return g_repeated * argmax_locations / np.sum(argmax_locations, axis=axis, keepdims=True)
 
 def argsort(x): 
-    return type(x)(sorted(range(len(x)), key=x.__getitem__)) 
+    return type(x)(sorted(range(len(x)), key=x.__getitem__))
 
 
 class Tensor:
@@ -692,28 +692,21 @@ class Tensor:
         out.grad_fn = grad_fn
         
         return out
-    
-    """
-    def transpose(self, order):
-        input_order = order
-        out = Tensor(np.transpose(self.data, order), (self,), op=self.transpose)
-        
-        def grad_fn(gradient):
-            self.grad += np.transpose(gradient, argsort(input_order))
-            # or: self.grad += np.transpose(gradient, np.argsort(input_order))
-        out.grad_fn = grad_fn
-
-        return out
-    """
         
     @staticmethod
     def transpose(x, axes=None):
+        print('x',x.shape)
         input_axes = axes
         x = x if isinstance(x, Tensor) else Tensor(x)
         out = Tensor(np.transpose(x.data, axes=axes), (x,), op=Tensor.transpose)
         
         def grad_fn(g):
-            x.grad += np.transpose(g, argsort(input_axes))
+            print(g.shape, input_axes)
+            # if len(input_axes) == 2 and g.ndim == 3:
+            #     input_axes = [0] + input_axes
+            # if input_axes is not None:
+            #     input_axes = argsort(input_axes) 
+            x.grad += np.transpose(g, input_axes)
         out.grad_fn = grad_fn
         
         return out
@@ -905,6 +898,28 @@ class Tensor:
         out.grad_fn = grad_fn
         
         return out
+    
+    def __matmul__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(self.data @ other.data, (self, other), op=self.__matmul__)
+        
+        # assuming self and other both 2d or both 3d or both 4d
+        def grad_fn(gradient):
+            if self.data.ndim == 2 and other.data.ndim == 2:
+                self.grad += gradient @ other.data.T
+                other.grad += self.data.T @ gradient
+            elif self.data.ndim > 2 and other.data.ndim > 2:
+                # swap last two dims
+                self.grad += gradient @ transpose_last_two(other.data)
+                other.grad += transpose_last_two(self.data) @ gradient
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    
+
+def transpose_last_two(x):
+    return Tensor.transpose(x, axes=list(range(len(x.shape)-2))+[-1, -2])
 
 if __name__=="__main__":
     # a = Tensor([[1,2,3],[3,4,5],[3,4,5]])
@@ -915,13 +930,19 @@ if __name__=="__main__":
     b = Tensor([[5, 6]])
     
     
-    c = Tensor.concatenate((a,Tensor.transpose(b)),axis=1)
-    print(c)
-    c.backward()
+    # c = Tensor.concatenate((a,Tensor.transpose(b)),axis=1)
+    # print(c)
+    # c.backward()
     
-    print(a)
-    print(b)
+    # print(a)
+    # print(b)
     
+    
+    a = Tensor.rand((10,4,5))
+    
+    b = transpose_last_two(a)
+    print(b.shape)
+    b.backward()
     
     
     
