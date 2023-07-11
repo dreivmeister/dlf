@@ -393,6 +393,17 @@ class Tensor:
         return out
     
     @staticmethod
+    def relu(x):
+        x = x if isinstance(x, Tensor) else Tensor(x)
+        out = Tensor(x.data * (x.data > 0), (x,), op=Tensor.relu)
+        
+        def grad_fn(g):
+            x.grad += g * (x.data > 0)
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    @staticmethod
     def sqrt(x):
         x = x if isinstance(x, Tensor) else Tensor(x)
         out = Tensor(np.sqrt(x.data), (x,), op=Tensor.sqrt)

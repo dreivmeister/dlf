@@ -152,6 +152,52 @@ class AttentionHead(Module):
     def parameters(self):
         return [*self.key.parameters(),*self.query.parameters(),*self.value.parameters()]
     
+class MHA(Module):
+    def __init__(self, block_size, n_embd, num_heads, head_size, dropout=0.5, do_mask=False):
+        self.heads = [AttentionHead(block_size=block_size,n_embd=n_embd,head_size=head_size,mask=do_mask) for _ in range(num_heads)]
+        self.proj = LinearLayer(n_embd, n_embd)
+        self.dropout = Dropout(dropout)
+
+    def __call__(self, x):
+        out = T.concatenate([h(x) for h in self.heads],axis=-1)
+        out = self.dropout(self.proj(out))
+        return out
+
+    def parameters(self):
+        return [*self.proj.parameters()] + [p for head in self.heads for p in head.parameters()]
+    
+class FeedForward(Module):
+    def __init__(self, n_embd):
+        self.ll1 = LinearLayer(n_embd, 4*n_embd,nonlin=T.relu)
+        self.ll2 = LinearLayer(4*n_embd, n_embd)
+        self.drop = Dropout(0.5)
+    
+    def __call__(self, x):
+        return self.drop(self.ll2(self.ll1(x)))
+    
+    def parameters(self):
+        return [*self.ll1.parameters(), *self.ll2.parameters()]
+
+class Block(Module):
+    def __init__(self, block_size, n_embd, num_heads, dropout=0.5, do_mask=False):
+        # block_size - context_length - length of sample
+        # n_embd - embedding_dimension - d_model
+        # num_heads - number of heads in MHA
+        # head_size - embedding dimension in single head
+        head_size = n_embd // num_heads
+        self.sa = MHA(block_size,n_embd,num_heads,head_size,dropout,do_mask)
+        self.ffwd = FeedForward(n_embd)
+        self.ln1 = LayerNorm(n_embd)
+        self.ln2 = LayerNorm(n_embd)
+        
+    def __call__(self, x):
+        x = x + self.sa(self.ln1(x))
+        x = x + self.ffwd(self.ln2(x))
+        return x
+    
+    def parameters(self):
+        return [*self.sa.parameters(),*self.ln1.parameters(),*self.ln2.parameters(),*self.ffwd.parameters()]
+    
     
 def negative_log_likelihood(probs, targets):
     # binary classification
@@ -172,7 +218,9 @@ if __name__=="__main__":
     # b = BatchNorm1D(1)
     # ll = LayerNorm(1)
     # d = Dropout(0.5)
-    #o = ll(b(d(l(x))))
+    # x = T.rand((10,3))
+    # o = ll(b(d(l(x))))
+    # o.backward()
     
     # x = T.rand((10,4,16))
     # ah = MHA(4,16,4,mask=True)
@@ -189,8 +237,14 @@ if __name__=="__main__":
     n_head = 4
     head_size = n_embd // n_head
     x = T.rand((batch_size,block_size,n_embd))
-    B = AttentionHead(block_size,n_embd,head_size,mask=True)
-    out = B(x)
-    print(out.shape)
-    out.backward()
-    print(out.shape)
+    
+    B = Block(block_size,n_embd,n_head,head_size,do_mask=True)
+    o = B(x)
+    o.backward()
+    print(o.shape)
+    
+    
+    # B = AttentionHead(block_size,n_embd,head_size,mask=True)
+    # o = B(x)
+    # print(o.shape)
+    # o.backward()
