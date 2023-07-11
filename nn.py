@@ -30,7 +30,7 @@ class LinearLayer(Module):
         self.nonlin = nonlin
     
     def __call__(self, x):
-        act = T.matmul(x, transpose_last_two(self.w))
+        act = T.dot(x, self.w.transpose((1,0)))
         if self.bias:
             act = act + self.b
         return self.nonlin(act) if self.nonlin else act
@@ -121,6 +121,7 @@ def softmax(logits, axis=1):
     exp_sum = T.sum(logits_exp, axis=axis, keepdims=True)
     return logits_exp / exp_sum
     
+    
 class AttentionHead(Module):
     def __init__(self, block_size, n_embd, head_size, dropout=0.2, mask=False):
         self.key = LinearLayer(n_embd, head_size, bias=False)
@@ -135,10 +136,9 @@ class AttentionHead(Module):
         self.dropout = Dropout(dropout)
     
     def __call__(self, x):
-        B, t, C = x.shape
-        k = self.key(x) # (batch_size,block_size,token_dim) @ (n_embd, head_size) 
+        b, t, c = x.shape # (10,4,16) (batch_size,block_size,n_embd)
+        k = self.key(x) # (batch_size,block_size,n_embd) @ (n_embd, head_size) 
         q = self.query(x) # (B,T,C)
-        print('q', q.shape)
         wei = T.matmul(q, T.transpose(k, (0,2,1))) # transpose last two dims
         if self.do_mask:
             wei = wei + self.mask
@@ -172,10 +172,25 @@ if __name__=="__main__":
     # b = BatchNorm1D(1)
     # ll = LayerNorm(1)
     # d = Dropout(0.5)
-    x = T.rand((10,4,16))
     #o = ll(b(d(l(x))))
-    ah = AttentionHead(4,16,4,mask=True)
-    o = ah(x)
-    print('o', o.shape)
-    o.backward()
-    print(o.shape)
+    
+    # x = T.rand((10,4,16))
+    # ah = MHA(4,16,4,mask=True)
+    # o = ah(x)
+    # print('o', o.shape)
+    # o.backward()
+    # print(o.shape)
+    
+    
+    batch_size = 4
+    block_size = 8
+
+    n_embd = 32
+    n_head = 4
+    head_size = n_embd // n_head
+    x = T.rand((batch_size,block_size,n_embd))
+    B = AttentionHead(block_size,n_embd,head_size,mask=True)
+    out = B(x)
+    print(out.shape)
+    out.backward()
+    print(out.shape)

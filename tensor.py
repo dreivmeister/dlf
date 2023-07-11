@@ -125,7 +125,6 @@ class Tensor:
         build_topo(self)
 
         for t in reversed(topo):
-            print(t.op)
             t.grad_fn(t.grad)
             
             
@@ -694,23 +693,27 @@ class Tensor:
         return out
         
     @staticmethod
-    def transpose(x, axes=None):
-        print('x',x.shape)
-        input_axes = axes
+    def transpose(x, order):
+        input_order = order
         x = x if isinstance(x, Tensor) else Tensor(x)
-        out = Tensor(np.transpose(x.data, axes=axes), (x,), op=Tensor.transpose)
+        out = Tensor(np.transpose(x.data, axes=order), (x,), op=Tensor.transpose)
         
         def grad_fn(g):
-            print(g.shape, input_axes)
-            # if len(input_axes) == 2 and g.ndim == 3:
-            #     input_axes = [0] + input_axes
-            # if input_axes is not None:
-            #     input_axes = argsort(input_axes) 
-            x.grad += np.transpose(g, input_axes)
+            x.grad += np.transpose(g, np.argsort(input_order))
         out.grad_fn = grad_fn
         
         return out
 
+
+    def transpose(self, order):
+        input_order = order
+        out = Tensor(np.transpose(self.data, order), (self,), op=self.transpose)
+        
+        def grad_fn(gradient):
+            self.grad += np.transpose(gradient, np.argsort(input_order))
+        out.grad_fn = grad_fn
+
+        return out
 
     @staticmethod
     def broadcast_to(x, new_shape):
