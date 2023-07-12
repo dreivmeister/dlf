@@ -178,7 +178,7 @@ class FeedForward(Module):
     def parameters(self):
         return [*self.ll1.parameters(), *self.ll2.parameters()]
 
-class Block(Module):
+class EncoderBlock(Module):
     def __init__(self, block_size, n_embd, num_heads, dropout=0.5, do_mask=False):
         # block_size - context_length - length of sample
         # n_embd - embedding_dimension - d_model
@@ -199,6 +199,44 @@ class Block(Module):
         return [*self.sa.parameters(),*self.ln1.parameters(),*self.ln2.parameters(),*self.ffwd.parameters()]
     
     
+    
+class VanillaRNNBlock(Module):
+    
+    def __init__(self, N, T, D, H, h0):
+        """
+        - batch size - N
+        - seq length - T
+        - elem dim   - D
+        - hidden dim - H
+        """
+        
+        self.N = N
+        self.T = T
+        self.H = H
+        self.prev_h = h0 # previous hidden state is h0
+        self.Wx = T.rand((D,H))
+        self.Wh = T.rand((H,H))
+        self.b = T.rand((H,))
+    
+    def rnn_step(self, x):
+        # x is of shape (N,D)
+        return T.tanh(T.dot(x, self.Wx) + T.dot(self.prev_h, self.Wh) + self.b)
+    
+    def __call__(self, x):
+        # x is of shape (N,T,D)
+        seq = []
+        
+        for i in range(self.T):
+            step_out = self.rnn_step(x[:,i,:]) # step_out (N,H)
+            seq.append(step_out)
+            self.prev_h = step_out
+        
+        return T.reshape(T.concatenate(seq), (self.N,self.T,self.H))
+    
+    def parameters(self):
+        return [self.Wx, self.Wh, self.b]
+    
+    
 def negative_log_likelihood(probs, targets):
     # binary classification
     # preds is a probability vector
@@ -211,6 +249,14 @@ def cross_entropy(probs, targets):
     # targets is a one hot vector
     log_probs = T.log(probs + 10e-20)
     return -T.sum(targets * log_probs)
+
+def mse_loss(preds, targets, reduction='mean'):
+    # preds is a prediction vector
+    # target contains the target values
+    if reduction == 'mean':
+        return T.mean((preds - targets)**2)
+    elif reduction == 'sum':
+        return T.sum((preds - targets)**2)
     
     
 if __name__=="__main__":
@@ -238,7 +284,7 @@ if __name__=="__main__":
     head_size = n_embd // n_head
     x = T.rand((batch_size,block_size,n_embd))
     
-    B = Block(block_size,n_embd,n_head,head_size,do_mask=True)
+    B = EncoderBlock(block_size,n_embd,n_head,head_size,do_mask=True)
     o = B(x)
     o.backward()
     print(o.shape)

@@ -913,24 +913,6 @@ class Tensor:
         
         return out
     
-    def __matmul__(self, other):
-        other = other if isinstance(other, Tensor) else Tensor(other)
-        out = Tensor(self.data @ other.data, (self, other), op=self.__matmul__)
-        
-        # assuming self and other both 2d or both 3d or both 4d
-        def grad_fn(gradient):
-            if self.data.ndim == 2 and other.data.ndim == 2:
-                self.grad += gradient @ other.data.T
-                other.grad += self.data.T @ gradient
-            elif self.data.ndim > 2 and other.data.ndim > 2:
-                # swap last two dims
-                self.grad += gradient @ transpose_last_two(other.data)
-                other.grad += transpose_last_two(self.data) @ gradient
-        out.grad_fn = grad_fn
-        
-        return out
-    
-    
 
 def transpose_last_two(x):
     return Tensor.transpose(x, axes=list(range(len(x.shape)-2))+[-1, -2])
