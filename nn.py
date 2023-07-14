@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 from tensor import Tensor as T
 
@@ -101,6 +102,24 @@ class LayerNorm(Module):
         return [self.gamma, self.beta]
     
     
+class MaxPool2d(Module):
+    def __init__(self, pool):
+        self.pool = pool
+        
+    def __call__(self, x):
+        new_shape = x.shape[:2]
+        for i in [0, 1]:
+            pool_w = self.pool[i]
+            img_w = x.shape[i+2]
+            new_shape += (img_w // pool_w, pool_w)
+        result = T.reshape(x, new_shape)
+        return T.max(T.max(result, axis=3), axis=4)
+    
+    def parameters(self):
+        return []
+
+    
+    
 class Dropout(Module):
     def __init__(self, p_drop) -> None:
         self.p_keep = 1 - p_drop
@@ -115,11 +134,22 @@ class Dropout(Module):
     def parameters(self):
         return []
     
-def softmax(logits, axis=1):
-    logits = logits - T.max(logits, axis=axis, keepdims=True)
-    logits_exp = T.exp(logits)
-    exp_sum = T.sum(logits_exp, axis=axis, keepdims=True)
-    return logits_exp / exp_sum
+# only stride 1 and valid
+class Conv2d(Module):
+    def __init__(self, in_channels, out_channels, kernel_size):
+        self.kernel_size = kernel_size
+        self.in_c = in_channels # input depth
+        self.out_c = out_channels # num filters
+        
+        kernels_shape = (out_channels, in_channels, kernel_size, kernel_size)
+        self.kernels = T.rand(kernels_shape)
+        
+    def __call__(self, x):
+        batch_size, channels, height, width = x.shape
+        out_shape = (batch_size, self.out_c, height-self.kernel_size+1, width-self.kernel_size+1)
+        return T.conv2d(x, self.kernels, out_shape)
+    
+
     
     
 class AttentionHead(Module):
@@ -236,6 +266,12 @@ class VanillaRNNBlock(Module):
     def parameters(self):
         return [self.Wx, self.Wh, self.b]
     
+    
+def softmax(logits, axis=1):
+    logits = logits - T.max(logits, axis=axis, keepdims=True)
+    logits_exp = T.exp(logits)
+    exp_sum = T.sum(logits_exp, axis=axis, keepdims=True)
+    return logits_exp / exp_sum
     
 def negative_log_likelihood(probs, targets):
     # binary classification

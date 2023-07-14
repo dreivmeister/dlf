@@ -1,6 +1,7 @@
 # basically everthing you need
 
 import numpy as np
+from scipy import signal
 
 
 # from autodidact
@@ -909,6 +910,35 @@ class Tensor:
             if B_is_vec:
                 result = np.squeeze(result, np.ndim(g) - 1)
             b.grad += result
+        out.grad_fn = grad_fn
+        
+        return out
+    
+    @staticmethod
+    def conv2d(x, kernels, output_shape):
+        # only stride=1 and valid padding
+        #https://github.com/TheIndependentCode/Neural-Network/blob/master/convolutional.py
+        # x is the input image
+        
+        batch_size, out_channels, out_height, out_width = output_shape
+        out = np.random.randn(*output_shape) # bias
+        
+        in_channels = x.shape[1]
+        for k in range(batch_size):
+            for i in range(out_channels):
+                for j in range(in_channels):
+                    out[k,i] += signal.correlate2d(x.data[k,j], kernels.data[i,j], "valid")
+        out = Tensor(out, (x, kernels), op=Tensor.conv2d)
+        
+        def grad_fn(gradient):
+            x.grad = np.zeros_like(x.data)
+            kernels.grad = np.zeros_like(kernels.data)
+
+            for k in range(batch_size):
+                for i in range(out_channels):
+                    for j in range(in_channels):
+                        kernels.grad[i,j] += signal.correlate2d(x.data[k,j], gradient[k,i], "valid")
+                        x.grad[k,j] += signal.convolve2d(gradient[k,i], kernels.data[i,j], "full")
         out.grad_fn = grad_fn
         
         return out
